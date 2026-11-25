@@ -77,6 +77,18 @@ describe("model catalog", () => {
     expect(getCatalogModalities("qoder", "efficient")).toBeNull();
   });
 
+  it("maps output modalities to imageOutput/audioOutput", () => {
+    const { models } = build(
+      { openrouter: { models: {
+        "recraft/recraft-v4.1-flash": { modalities: { input: ["text"], output: ["image"] } },
+        "openai/gpt-4o-mini-tts": { modalities: { input: ["text"], output: ["audio"] } },
+      } } },
+      [],
+    );
+    expect(models["openrouter:recraft-v4.1-flash"]).toEqual({ imageOutput: true });
+    expect(models["openrouter:gpt-4o-mini-tts"]).toEqual({ audioOutput: true });
+  });
+
   it("resolves a gateway the file was written for, and nobody else", () => {
     expect(getCatalogModalities("glm", "glm-4.6v")).toEqual({ vision: true });
     expect(getCatalogModalities("zai", "glm-4.6v")).toEqual({ vision: true });

@@ -16,6 +16,11 @@ const STARTUP_DELAY_MS = 60 * 1000;   // let the server boot and serve first req
 const RETRY_DELAY_MS = 30 * 60 * 1000;
 
 const MODALITY_BY_INPUT = { image: "vision", pdf: "pdf", audio: "audioInput", video: "videoInput" };
+// Output modalities map to the generate-* capability flags. models.dev lists
+// these under modalities.output (e.g. ["image"] for recraft/seedream/flux);
+// without this the catalog can never turn imageOutput/audioOutput on and every
+// image model falls back to DEFAULT_CAPABILITIES (imageOutput:false).
+const MODALITY_BY_OUTPUT = { image: "imageOutput", audio: "audioOutput" };
 // Ignore limit differences below this: gateways round 200000 vs 202752.
 const LIMIT_TOLERANCE = 0.1;
 
@@ -116,6 +121,10 @@ export function build(catalog, entries) {
       const declared = {};
       for (const input of model?.modalities?.input || []) {
         const key = MODALITY_BY_INPUT[input];
+        if (key) declared[key] = true;
+      }
+      for (const output of model?.modalities?.output || []) {
+        const key = MODALITY_BY_OUTPUT[output];
         if (key) declared[key] = true;
       }
       if (Object.keys(declared).length) {

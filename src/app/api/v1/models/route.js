@@ -203,6 +203,21 @@ const LIVE_MODEL_RESOLVERS = {
     if (!result?.models?.length) return null;
     return { models: result.models.map(({ id, name }) => ({ id, name })) };
   },
+  // OpenRouter's image catalog rotates (70+ ids) and is authoritative at
+  // GET /api/v1/images/models (architecture.output_modalities includes "image").
+  // Trust it live instead of hardcoding ids: merge the static non-image models
+  // (embedding/tts/video/systemone) with the live image list. Fail-open: on any
+  // error the static list stands as before.
+  openrouter: async () => {
+    const staticModels = PROVIDER_MODELS.openrouter || [];
+    const live = await fetchOpenRouterImageModels();
+    if (!live.length) return null;
+    // Preserve each static model's kind (embedding/tts/video/image) so the kind
+    // filter routes them correctly; the live image ids are kind:"image".
+    const merged = staticModels.map((m) => ({ id: m.id, name: m.name, kind: modelKind(m) }));
+    for (const m of live) merged.push({ id: m.id, name: m.name, kind: "image", capabilities: { imageOutput: true } });
+    return { models: merged };
+  },
 };
 
 const parseOpenAIStyleModels = (data) => {
@@ -299,6 +314,48 @@ async function fetchCompatibleModelIds(connection) {
   } catch {
     return [];
   }
+}
+
+// Live image catalog (image generation). The static capability tables cannot
+// enumerate the 70+ rotating image ids a gateway like OpenRouter exposes, so the
+// live resolver fetches the authoritative GET /api/v1/images/models once
+// (TTL-cached) and trusts architecture.output_modalities. Fail-open: on any error
+// the static registry list stands as before.
+const OUTPUT_MODALITY_TTL_MS = 10 * 60 * 1000;
+const outputModalityCache = new Map(); // url -> { models, expiresAt }
+
+async function fetchOpenRouterImageModels() {
+  const url = "https://openrouter.ai/api/v1/images/models";
+  const cached = outputModalityCache.get(url);
+  if (cached && Date.now() < cached.expiresAt) return cached.models || [];
+
+  let models = [];
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch(url, {
+      headers: { accept: "application/json" },
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    if (res.ok) {
+      const data = await res.json();
+      for (const model of parseOpenAIStyleModels(data)) {
+        const out = model?.architecture?.output_modalities;
+        if (!Array.isArray(out) || !out.includes("image")) continue;
+        const id = model?.id || model?.name;
+        if (typeof id === "string" && id.trim() !== "") {
+          models.push({ id, name: model?.name || id });
+        }
+      }
+    }
+  } catch {
+    models = [];
+  }
+
+  outputModalityCache.set(url, { models, expiresAt: Date.now() + OUTPUT_MODALITY_TTL_MS });
+  return models;
 }
 
 // Provider matches kindFilter when its serviceKinds intersect the requested kinds.
@@ -629,7 +686,10 @@ export async function buildModelsList(kindFilter, options = {}) {
         // pattern-matched capabilities the dashboard uses (useModelCaps.js) so
         // dynamically-discovered LLM models still surface vision/reasoning/search/tools.
         const liveCaps = liveCapabilitiesById.get(modelId);
-        const serviceCaps = capabilitiesFromServiceKind(customKind || liveKind);
+        // custom/live metadata first, then the resolved kind (static image/tts/etc.
+        // models carry no custom/live kind but still map to a service-kind capability
+        // set, e.g. kind:"image" -> imageOutput:true).
+        const serviceCaps = capabilitiesFromServiceKind(customKind || liveKind || kind);
         const caps = liveCaps || serviceCaps || (kind === LLM_KIND ? getCapabilitiesForModel(providerId, modelId) : null);
         if (caps) model.capabilities = caps;
         // Token limits under the snake_case names the OpenAI/OpenRouter

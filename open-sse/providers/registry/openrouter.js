@@ -40,12 +40,16 @@ export default {
     { id: "openai/gpt-image-1", name: "GPT Image 1 (via OpenRouter)", params: ["n","size","quality","response_format"], kind: "image" },
     { id: "google/imagen-3.0-generate-002", name: "Imagen 3 (via OpenRouter)", params: ["n","size"], kind: "image" },
     { id: "black-forest-labs/FLUX.1-schnell", name: "FLUX.1 Schnell (via OpenRouter)", params: ["n","size"], kind: "image" },
+    // The rest of the image catalog (70+ rotating ids: recraft, seedream, flux.2,
+    // gpt-image-2.x, qwen-image, mai-image, riverflow, krea, hy-image, muse-image…)
+    // is fetched live from GET /api/v1/images/models by the OpenRouter live model
+    // resolver in src/app/api/v1/models/route.js — no per-id maintenance here.
     { id: "google/veo-3.1", name: "Veo 3.1 (via OpenRouter)", params: ["duration","aspect_ratio","resolution"], kind: "video" },
     { id: "openai/sora-2-pro", name: "Sora 2 Pro (via OpenRouter)", params: ["duration","aspect_ratio","resolution"], kind: "video" },
     { id: "bytedance/seedance-2.0", name: "Seedance 2.0 (via OpenRouter)", params: ["duration","aspect_ratio","resolution"], kind: "video" },
     { id: "typesafe/jev-1.13", name: "Jev 1.13", kind: "systemone" },
   ],
-  serviceKinds: ["llm","embedding","tts","imageToText","video","systemone"],
+  serviceKinds: ["llm","embedding","tts","image","imageToText","video","systemone"],
   // System One decision API (TypeSafe-compatible): https://openrouter.ai/docs/guides/community/typesafe-sdk
   systemoneConfig: {
     baseUrl: "https://openrouter.ai/api/v1/systemone",

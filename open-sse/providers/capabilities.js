@@ -540,6 +540,25 @@ PROVIDER_CAPABILITIES["sensenova-intl"] = {
  * a broad family pattern swallowing an exception (e.g. glm-4.6v vs glm-5).
  */
 export const PATTERN_CAPABILITIES = [
+  // ── Image-generation families (output modality: image) ───────────
+  // Image models answer with an image, not text. They must precede the generic
+  // family patterns below (e.g. *qwen*, *gpt-*, *muse*) so first-match-wins
+  // resolves them as imageOutput instead of a text chat model. Covers the
+  // families OpenRouter exposes via /images/models (recraft, seedream, flux,
+  // gpt-image, qwen-image, mai-image, riverflow, krea, hy-image, muse-image,
+  // imagen) plus the free-tier passthrough ids that carry a ":free" suffix.
+  { pattern: "*recraft*",       caps: { imageOutput: true } },
+  { pattern: "*seedream*",      caps: { imageOutput: true } },
+  { pattern: "*flux*",          caps: { imageOutput: true } },
+  { pattern: "*gpt-image*",     caps: { imageOutput: true } },
+  { pattern: "*qwen*image*",    caps: { imageOutput: true } },
+  { pattern: "*mai-image*",     caps: { imageOutput: true } },
+  { pattern: "*riverflow*",     caps: { imageOutput: true } },
+  { pattern: "*krea*",          caps: { imageOutput: true } },
+  { pattern: "*hy-image*",      caps: { imageOutput: true } },
+  { pattern: "*muse*image*",    caps: { imageOutput: true } },
+  { pattern: "*imagen*",        caps: { imageOutput: true } },
+
   // ── Claude (4.6+ = adaptive thinking; older/haiku = budget) ──────
   { pattern: "*claude*opus-5*",     caps: { vision: true, pdf: true, reasoning: true, search: true, thinkingFormat: "claude-adaptive", contextWindow: 1000000, maxOutput: 128000 } },
   { pattern: "*claude*sonnet-5*",   caps: { vision: true, pdf: true, reasoning: true, search: true, thinkingFormat: "claude-adaptive", contextWindow: 1000000, maxOutput: 128000 } },
@@ -794,6 +813,8 @@ export function aggregateComboCapabilities(comboModels, comboLookup = null, reso
  * @returns {object} full capabilities object
  */
 const MODALITY_KEYS = ["vision", "pdf", "audioInput", "videoInput"];
+// Output modalities flipped on by the synced catalog (modalities.output).
+const OUTPUT_MODALITY_KEYS = ["imageOutput", "audioOutput"];
 
 // Catalog lookups, installed by the server at startup. Left as no-ops in the
 // browser bundle, where there is no file to read.
@@ -831,6 +852,9 @@ function refine(base, provider, model) {
     const modalities = source.getModalities(provider, model);
     if (modalities) {
       for (const key of MODALITY_KEYS) {
+        if (modalities[key] === true) result[key] = true;
+      }
+      for (const key of OUTPUT_MODALITY_KEYS) {
         if (modalities[key] === true) result[key] = true;
       }
     }

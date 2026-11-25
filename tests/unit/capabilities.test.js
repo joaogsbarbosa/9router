@@ -291,6 +291,39 @@ describe("getCapabilitiesForModel — codebuddy-cn provider overrides", () => {
   });
 });
 
+describe("image-generation model families", () => {
+  // Image models output an image, not text. OpenRouter serves these as
+  // passthrough models (/images/models), so the only signal is the model id —
+  // the pattern table must resolve them to imageOutput:true before the generic
+  // *qwen*/*gpt-**/*muse* chat patterns win. Regression for recraft returning
+  // imageOutput:false on /v1/models.
+  it("flags OpenRouter image families as imageOutput", () => {
+    for (const model of [
+      "recraft/recraft-v4.1-flash-v2:free",
+      "bytedance-seed/seedream-5-5",
+      "black-forest-labs/flux-3-image",
+      "openai/gpt-image-1",
+      "qwen/qwen-image-3-pro",
+      "google/gemini-3-pro-image",
+      "x-ai/grok-imagine-image-2.0",
+      "minimax/minimax-h3-image",
+      "microsoft/mai-image-2.7",
+      "sourceful/riverflow-v2.6-pro",
+      "krea/krea-2-large",
+      "meta/muse-image",
+      "google/imagen-3.0-generate-002",
+    ]) {
+      expect(getCapabilitiesForModel("openrouter", model).imageOutput, model).toBe(true);
+    }
+  });
+
+  it("keeps text chat models imageOutput:false", () => {
+    for (const model of ["openai/gpt-5.2", "qwen/qwen3-max", "deepseek/deepseek-v4.1-flash"]) {
+      expect(getCapabilitiesForModel("openrouter", model).imageOutput, model).toBe(false);
+    }
+  });
+});
+
 describe("OpenCode Free ids newer than the capability tables", () => {
   // ids missing here fall through to DEFAULT_CAPABILITIES (reasoning: false),
   // and applyThinking() then deletes the client's reasoning_effort — see #2690.
