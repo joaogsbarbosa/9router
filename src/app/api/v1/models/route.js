@@ -645,7 +645,14 @@ export async function buildModelsList(kindFilter, options = {}) {
       const customModelIds = customModels
         .filter((m) => {
           if (!m?.id) return false;
-          const kind = getModelKind(m) || LLM_KIND;
+          // Resolve an untyped custom model's kind from the authoritative live
+          // catalog / name heuristic, not a blind llm default. Otherwise a
+          // passthrough image model (recraft) added as a custom model is treated
+          // as llm and dropped from /v1/models/image before it is ever emitted.
+          const modelId = String(m.id).trim();
+          const kind = getModelKind(m)
+            || liveModelKindById.get(modelId)
+            || inferKindFromUnknownModelId(modelId);
           // imageToText custom models are vision-capable chat models: expose them
           // both in the default LLM list and in /v1/models/image-to-text.
           if (!kindFilter.includes(kind) && !(kind === "imageToText" && kindFilter.includes(LLM_KIND))) return false;
@@ -654,7 +661,14 @@ export async function buildModelsList(kindFilter, options = {}) {
         })
         .map((m) => {
           const modelId = String(m.id).trim();
-          if (modelId) customModelKindById.set(modelId, getModelKind(m) || LLM_KIND);
+          // Only record an EXPLICIT custom kind. An untyped custom model defaults
+          // to llm for the filter above, but writing that default here would let
+          // it override the live catalog / static seed / name heuristic — e.g. a
+          // passthrough OpenRouter image model (recraft) added as a custom model
+          // would be forced to llm and never reach /v1/models/image. Leaving it
+          // unset lets the authoritative live kind (image) win.
+          const explicitKind = getModelKind(m);
+          if (modelId && explicitKind) customModelKindById.set(modelId, explicitKind);
           return modelId;
         })
         .filter((modelId) => modelId !== "");
