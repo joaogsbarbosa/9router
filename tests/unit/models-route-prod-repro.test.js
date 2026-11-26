@@ -70,13 +70,25 @@ describe("PROD repro: untyped custom model recraft", () => {
     expect(llm.find((m) => m.id === "openrouter/recraft/recraft-v4.1-flash-v2:free")).toBeUndefined();
   });
 
-  it("explicit llm custom model still stays in LLM", async () => {
+  it("explicit llm custom model is overridden by authoritative image kind", async () => {
     state.customModels = [{
       id: "recraft/recraft-v4.1-flash-v2:free",
       providerAlias: "openrouter",
       kind: "llm",
     }];
-    const llm = await buildModelsList(["llm"]);
-    expect(llm.find((m) => m.id === "openrouter/recraft/recraft-v4.1-flash-v2:free")).toBeTruthy();
+    const image = await buildModelsList(["image"]);
+    const recraft = image.find((m) => m.id === "openrouter/recraft/recraft-v4.1-flash-v2:free");
+    expect(recraft, "authoritative image kind must win over a default llm custom row").toBeTruthy();
+    expect(recraft.capabilities?.imageOutput).toBe(true);
+  });
+
+  it("explicit non-llm custom kind is respected", async () => {
+    state.customModels = [{
+      id: "recraft/recraft-v4.1-flash-v2:free",
+      providerAlias: "openrouter",
+      kind: "image",
+    }];
+    const image = await buildModelsList(["image"]);
+    expect(image.find((m) => m.id === "openrouter/recraft/recraft-v4.1-flash-v2:free")).toBeTruthy();
   });
 });

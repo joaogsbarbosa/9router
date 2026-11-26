@@ -650,9 +650,17 @@ export async function buildModelsList(kindFilter, options = {}) {
           // passthrough image model (recraft) added as a custom model is treated
           // as llm and dropped from /v1/models/image before it is ever emitted.
           const modelId = String(m.id).trim();
-          const kind = getModelKind(m)
-            || liveModelKindById.get(modelId)
+          // Resolve kind from the authoritative live catalog / static seed / name
+          // heuristic. A custom row that defaults to llm (the common "add custom
+          // model" default, and what a passthrough OpenRouter image model like
+          // recraft gets) must not be treated as llm and dropped from
+          // /v1/models/image before it is ever emitted.
+          const authoritativeKind = liveModelKindById.get(modelId)
+            || staticModelKindById.get(modelId)
             || inferKindFromUnknownModelId(modelId);
+          const customKind = getModelKind(m);
+          const kind = (customKind && customKind !== LLM_KIND) ? customKind
+            : (authoritativeKind || customKind || LLM_KIND);
           // imageToText custom models are vision-capable chat models: expose them
           // both in the default LLM list and in /v1/models/image-to-text.
           if (!kindFilter.includes(kind) && !(kind === "imageToText" && kindFilter.includes(LLM_KIND))) return false;
@@ -661,14 +669,13 @@ export async function buildModelsList(kindFilter, options = {}) {
         })
         .map((m) => {
           const modelId = String(m.id).trim();
-          // Only record an EXPLICIT custom kind. An untyped custom model defaults
-          // to llm for the filter above, but writing that default here would let
-          // it override the live catalog / static seed / name heuristic — e.g. a
+          // Record the custom kind (explicit or defaulted). The merge loop below
+          // refuses to let an llm value downgrade a model the live catalog /
+          // static seed / capability table classifies as image/tts/etc., so a
           // passthrough OpenRouter image model (recraft) added as a custom model
-          // would be forced to llm and never reach /v1/models/image. Leaving it
-          // unset lets the authoritative live kind (image) win.
-          const explicitKind = getModelKind(m);
-          if (modelId && explicitKind) customModelKindById.set(modelId, explicitKind);
+          // still reaches /v1/models/image.
+          const customKind = getModelKind(m);
+          if (modelId && customKind) customModelKindById.set(modelId, customKind);
           return modelId;
         })
         .filter((modelId) => modelId !== "");
@@ -702,7 +709,18 @@ export async function buildModelsList(kindFilter, options = {}) {
         // Resolve kind: prefer custom/live metadata, then static, then ID heuristics.
         const customKind = customModelKindById.get(modelId);
         const liveKind = liveModelKindById.get(modelId);
-        const kind = customKind || liveKind || staticModelKindById.get(modelId) || inferKindFromUnknownModelId(modelId);
+        const staticKind = staticModelKindById.get(modelId);
+        const inferredKind = inferKindFromUnknownModelId(modelId);
+        let kind = customKind || liveKind || staticKind || inferredKind;
+        // A custom row that defaults to llm (the common "add custom model" default,
+        // and what a passthrough OpenRouter image model like recraft gets) must not
+        // downgrade a model the live catalog / static seed / capability table
+        // authoritatively classifies as image/tts/etc. Only a non-llm custom kind,
+        // or a non-llm live/static/inferred kind, should win over that default.
+        if (kind === LLM_KIND) {
+          const authoritative = liveKind || staticKind || inferredKind;
+          if (authoritative && authoritative !== LLM_KIND) kind = authoritative;
+        }
         // imageToText custom models stay in the LLM list (vision-capable chat models)
         const allowAsLlm = kind === "imageToText" && kindFilter.includes(LLM_KIND);
         if (!kindFilter.includes(kind) && !allowAsLlm) continue;
@@ -721,7 +739,7 @@ export async function buildModelsList(kindFilter, options = {}) {
         // custom/live metadata first, then the resolved kind (static image/tts/etc.
         // models carry no custom/live kind but still map to a service-kind capability
         // set, e.g. kind:"image" -> imageOutput:true).
-        const serviceCaps = capabilitiesFromServiceKind(customKind || liveKind || kind);
+        const serviceCaps = capabilitiesFromServiceKind(kind);
         const caps = liveCaps || serviceCaps || (kind === LLM_KIND ? getCapabilitiesForModel(providerId, modelId) : null);
         if (caps) model.capabilities = caps;
         // Token limits under the snake_case names the OpenAI/OpenRouter
