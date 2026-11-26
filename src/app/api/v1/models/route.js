@@ -256,6 +256,13 @@ function inferKindFromUnknownModelId(modelId) {
   if (/embed/.test(lower)) return "embedding";
   if (/tts|speech|audio|voice/.test(lower)) return "tts";
   if (/image|imagen|dall-?e|flux|sdxl|sd-|stable-diffusion/.test(lower)) return "image";
+  // Name patterns above miss rotating gateway image families (recraft, seedream,
+  // gpt-image, mai-image, riverflow, krea, muse-image…). The capability pattern
+  // table already flags those as imageOutput, so consult it before defaulting to
+  // LLM — otherwise such a model never reaches /v1/models/image.
+  const caps = getCapabilitiesForModel(null, modelId);
+  if (caps?.imageOutput) return "image";
+  if (caps?.audioOutput) return "tts";
   return LLM_KIND;
 }
 
@@ -586,12 +593,23 @@ export async function buildModelsList(kindFilter, options = {}) {
       // Config-driven live catalog override (e.g. Kiro returns dynamic
       // -thinking/-agentic variants per account). On failure, fall back to
       // whatever rawModelIds already holds.
+      //
+      // The resolver also runs when an explicit enabledModels list is set: its
+      // kind/capability map is authoritative for rotating ids (OpenRouter's
+      // 70+ image models) that the static seed never lists. Gating the resolver
+      // off here left those ids to inferKindFromUnknownModelId, which only knows
+      // a few name patterns and classified e.g. recraft as an LLM — so it never
+      // reached /v1/models/image. The enabledModels list still governs the SET of
+      // models (rawModelIds is only replaced when no explicit list is present);
+      // the resolver now only enriches kind/capabilities.
       const liveResolver = LIVE_MODEL_RESOLVERS[providerId];
-      if (liveResolver && !hasExplicitEnabledModels) {
+      if (liveResolver) {
         try {
           const live = await liveResolver(conn);
           if (live?.models?.length) {
-            rawModelIds = live.models.map((m) => m.id);
+            if (!hasExplicitEnabledModels) {
+              rawModelIds = live.models.map((m) => m.id);
+            }
             liveModelKindById = new Map(
               live.models
                 .filter((m) => m?.id)

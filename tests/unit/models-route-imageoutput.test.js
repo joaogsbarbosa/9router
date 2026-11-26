@@ -101,4 +101,22 @@ describe("/v1/models OpenRouter image models (live, no hardcode)", () => {
     // static seed (dall-e-3/gpt-image-1/imagen/flux.1-schnell) still present
     expect(image.find((m) => m.id === "openrouter/openai/dall-e-3")).toBeTruthy();
   });
+
+  // Regression: a curated connection (enabledModels set) used to skip the live
+  // resolver entirely, so a rotating image id like recraft — absent from the
+  // static seed — was classified as LLM and never reached /v1/models/image.
+  it("surfaces live image models even when the connection has an explicit enabledModels list", async () => {
+    state.connections = [openRouterConnection(["recraft/recraft-v4.1-flash-v2:free"])];
+
+    const image = await buildModelsList(["image"]);
+    const byId = new Map(image.map((m) => [m.id, m]));
+    const recraft = byId.get("openrouter/recraft/recraft-v4.1-flash-v2:free");
+    expect(recraft, "recraft must be present despite enabledModels gate").toBeTruthy();
+    expect(recraft.capabilities?.imageOutput).toBe(true);
+    // enabledModels still governs the set: a non-enabled live id stays out.
+    expect(byId.get("openrouter/bytedance-seed/seedream-5-5")).toBeUndefined();
+    // and it must not leak into the LLM list
+    const llm = await buildModelsList(["llm"]);
+    expect(llm.find((m) => m.id === "openrouter/recraft/recraft-v4.1-flash-v2:free")).toBeUndefined();
+  });
 });
