@@ -33,6 +33,11 @@ export default {
         const format = /wav/.test(ct) ? "wav" : /pcm/.test(ct) ? "pcm" : /mpeg|mp3/.test(ct) ? "mp3" : "mp3";
         return { base64: buf.toString("base64"), format };
       }
+    } else if ([401, 402, 403, 429].includes(speechRes.status)) {
+      // Auth/quota errors are not fixed by the chat/completions fallback (which
+      // would 400 on TTS-only models and mask the real cause). Surface them.
+      const err = await speechRes.json().catch(() => ({}));
+      throw new Error(`[${speechRes.status}] ${err?.error?.message || "OpenRouter TTS failed"}`);
     }
 
     // 2) Fallback: chat completions + audio modality.

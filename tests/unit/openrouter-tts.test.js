@@ -61,4 +61,19 @@ describe("OpenRouter TTS", () => {
     expect(mock.mock.calls[1][0]).toBe("https://openrouter.ai/api/v1/chat/completions");
     expect(out.format).toBe("wav");
   });
+
+  it("surfaces 402 (no credits) instead of masking it with the chat fallback", async () => {
+    const mock = vi.fn(async () =>
+      new Response(JSON.stringify({ error: { message: "Insufficient credits" } }), {
+        status: 402,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    global.fetch = mock;
+
+    await expect(
+      openrouter.synthesize("olá", "google/gemini-2.5-flash-tts", { apiKey: "k" }),
+    ).rejects.toThrow("[402] Insufficient credits");
+    expect(mock).toHaveBeenCalledTimes(1);
+  });
 });
