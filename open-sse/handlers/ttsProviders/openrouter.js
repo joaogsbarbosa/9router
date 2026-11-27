@@ -1,36 +1,44 @@
-// OpenRouter TTS — via chat completions + audio modality (SSE stream)
+// OpenRouter TTS — endpoint dedicado /audio/speech (modelos TTS) com fallback
+// para chat completions + audio modality (modelos conversacionais com áudio).
 import { PROVIDER_MEDIA } from "../../providers/index.js";
 
 const TTS_CFG = PROVIDER_MEDIA["openrouter"]?.ttsConfig || {};
+const SPEECH_URL = TTS_CFG.speechUrl || TTS_CFG.baseUrl;
 
 export default {
-  async synthesize(text, model, credentials) {
+  async synthesize(text, model, credentials, _responseFormat, opts = {}) {
     if (!credentials?.apiKey) throw new Error("No OpenRouter API key configured");
 
-    // model format: "tts-model/voice" e.g. "openai/gpt-4o-mini-tts/alloy"
-    let ttsModel = TTS_CFG.defaultModel;
-    let voice = "alloy";
-    if (model && model.includes("/")) {
-      const lastSlash = model.lastIndexOf("/");
-      const maybVoice = model.slice(lastSlash + 1);
-      const maybeModel = model.slice(0, lastSlash);
-      if (maybeModel.includes("/")) {
-        ttsModel = maybeModel;
-        voice = maybVoice;
-      } else {
-        voice = model;
+    // `model` é o id do modelo OpenRouter (ex.: "fish-audio/s2.1-pro-free");
+    // a voz vem do corpo (body.voice), pois ids de modelo contêm "/".
+    const ttsModel = model || TTS_CFG.defaultModel;
+    const voice = opts?.options?.voice || opts?.voice || "alloy";
+    const headers = {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${credentials.apiKey}`,
+      ...(TTS_CFG.headers || {}),
+    };
+
+    // 1) Endpoint dedicado (/audio/speech). Sem response_format: provedores
+    // dedicados variam (ex.: heygen só aceita "pcm") e escolhem o default.
+    const speechRes = await fetch(SPEECH_URL, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ model: ttsModel, input: text, voice }),
+    });
+    if (speechRes.ok) {
+      const buf = Buffer.from(await speechRes.arrayBuffer());
+      if (buf.length > 0) {
+        const ct = (speechRes.headers.get("content-type") || "").toLowerCase();
+        const format = /wav/.test(ct) ? "wav" : /pcm/.test(ct) ? "pcm" : /mpeg|mp3/.test(ct) ? "mp3" : "mp3";
+        return { base64: buf.toString("base64"), format };
       }
-    } else if (model) {
-      voice = model;
     }
 
+    // 2) Fallback: chat completions + audio modality.
     const res = await fetch(TTS_CFG.baseUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${credentials.apiKey}`,
-        ...(TTS_CFG.headers || {}),
-      },
+      headers,
       body: JSON.stringify({
         model: ttsModel,
         modalities: ["text", "audio"],
