@@ -33,6 +33,12 @@ const GEMINI_VOICES = [
   "Vindemiatrix", "Sadachbia", "Sadaltager", "Sulafat",
 ].map((id) => ({ id, name: id, type: "tts" }));
 
+// HeyGen prebuilt voices (https://openrouter.ai/heygen/heygen-voice-1-turbo)
+const HEYGEN_VOICES = [
+  "nadine", "tabitha", "bram", "gareth", "noelle", "meredith",
+  "sabrina", "lucian", "weston", "vincent",
+].map((id) => ({ id, name: id, type: "tts" }));
+
 // Xiaomi MiMo preset voices (from https://mimo.mi.com/docs/zh-CN/quick-start/usage-guide/audio/speech-synthesis-v2.5).
 // Voice id is passed via `audio.voice`; `mimo_default` = default (冰糖 on CN cluster, Mia elsewhere).
 // Voices are language-independent — the spoken language is a separate hint, not bound to the voice.
@@ -117,14 +123,14 @@ export const TTS_MODELS_CONFIG = {
   },
   openrouter: {
     models: [
-      { id: "openai/gpt-4o-mini-tts", name: "GPT-4o Mini TTS", type: "tts" },
-      { id: "openai/tts-1-hd",        name: "TTS-1 HD",        type: "tts" },
-      { id: "openai/tts-1",           name: "TTS-1",           type: "tts" },
+      { id: "google/gemini-2.5-flash-tts", name: "Gemini 2.5 Flash TTS", type: "tts" },
+      { id: "heygen/heygen-voice-1-turbo", name: "HeyGen Voice 1 Turbo", type: "tts" },
+      { id: "fish-audio/s2.1-pro",       name: "Fish Audio S2.1 Pro",  type: "tts" },
     ],
     voices: {
-      "openai/gpt-4o-mini-tts": VOICES_FULL,
-      "openai/tts-1":           VOICES_STANDARD,
-      "openai/tts-1-hd":        VOICES_STANDARD,
+      "google/gemini-2.5-flash-tts": GEMINI_VOICES,
+      "heygen/heygen-voice-1-turbo": HEYGEN_VOICES,
+      "fish-audio/s2.1-pro":         VOICES_FULL, // open-ended voice, any accepted
     },
     allVoices: VOICES_FULL,
   },

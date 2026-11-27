@@ -33,9 +33,9 @@ export default {
     { id: "perplexity/pplx-embed-v1-4b", name: "Perplexity Embed V1 4B", kind: "embedding" },
     { id: "perplexity/pplx-embed-v1-0.6b", name: "Perplexity Embed V1 0.6B", kind: "embedding" },
     { id: "nvidia/llama-nemotron-embed-vl-1b-v2:free", name: "NVIDIA Nemotron Embed VL 1B V2 (Free)", kind: "embedding" },
-    { id: "openai/gpt-4o-mini-tts", name: "GPT-4o Mini TTS", kind: "tts" },
-    { id: "openai/tts-1-hd", name: "TTS-1 HD", kind: "tts" },
-    { id: "openai/tts-1", name: "TTS-1", kind: "tts" },
+    { id: "google/gemini-2.5-flash-tts", name: "Gemini 2.5 Flash TTS", kind: "tts" },
+    { id: "heygen/heygen-voice-1-turbo", name: "HeyGen Voice 1 Turbo", kind: "tts" },
+    { id: "fish-audio/s2.1-pro", name: "Fish Audio S2.1 Pro", kind: "tts" },
     { id: "openai/dall-e-3", name: "DALL-E 3 (via OpenRouter)", params: ["size","quality","style","response_format"], kind: "image" },
     { id: "openai/gpt-image-1", name: "GPT Image 1 (via OpenRouter)", params: ["n","size","quality","response_format"], kind: "image" },
     { id: "google/imagen-3.0-generate-002", name: "Imagen 3 (via OpenRouter)", params: ["n","size"], kind: "image" },
@@ -54,7 +54,7 @@ export default {
   ttsConfig: {
     baseUrl: "https://openrouter.ai/api/v1/chat/completions",
     speechUrl: "https://openrouter.ai/api/v1/audio/speech",
-    defaultModel: "openai/gpt-4o-mini-tts",
+    defaultModel: "google/gemini-2.5-flash-tts",
     headers: {"HTTP-Referer":"https://endpoint-proxy.local","X-Title":"Endpoint Proxy"},
   },
   embeddingConfig: {
